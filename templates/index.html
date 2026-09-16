@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Volcano Monitoring Center — Indonesia</title>
+  <meta name="description" content="Sistem Monitoring Gunung Api Indonesia Real-Time — PVMBG MAGMA, BMKG TEWS, USGS, Open Meteo, dan SOP Pendakian.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap 5 & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- SocketIO Client Library -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div class="app-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo">🌋</div>
+      <div>
+        <div class="brand-text">Volcano Center</div>
+        <div class="brand-subtitle">INDONESIA MONITORING</div>
+      </div>
+    </div>
+
+    <ul class="sidebar-menu">
+      <li class="menu-item">
+        <button class="active" data-section="sec-dashboard">
+          <i class="bi bi-grid-1x2-fill"></i> Dashboard Utama
+        </button>
+      </li>
+      <li class="menu-item">
+        <button data-section="sec-monitoring">
+          <i class="bi bi-activity"></i> Monitoring Gunung
+        </button>
+      </li>
+      <li class="menu-item">
+        <button data-section="sec-kubah-lava">
+          <i class="bi bi-triangle-half"></i> Kubah Lava
+        </button>
+      </li>
+      <li class="menu-item">
+        <button data-section="sec-peta-gempa">
+          <i class="bi bi-geo-alt-fill"></i> Peta Sebaran Gempa
+        </button>
+      </li>
+      <li class="menu-item">
+        <button onclick="window.location.href='/edukasi'">
+          <i class="bi bi-shield-exclamation text-warning"></i> Edukasi & Keselamatan
+        </button>
+      </li>
+      <li class="menu-item">
+        <button data-section="sec-telegram-log">
+          <i class="bi bi-telegram"></i> Telegram Real-Time
+        </button>
+      </li>
+    </ul>
+  </aside>
+
+  <!-- Main Content Wrapper -->
+  <div class="main-wrapper">
+    <!-- Navbar -->
+    <header class="navbar">
+      <div class="nav-left">
+        <h1 class="page-title">VOLCANO MONITORING CENTER</h1>
+      </div>
+      <div class="nav-right">
+        <a href="/edukasi" class="btn btn-sm btn-warning font-monospace fw-bold me-2">
+          <i class="bi bi-shield-exclamation"></i> Edukasi & Keselamatan
+        </a>
+
+        <!-- WIB Realtime Clock -->
+        <div class="clock-widget" id="realtime-clock-wib">
+          <i class="bi bi-clock-history"></i> Memuat WIB...
+        </div>
+
+        <!-- Dark Mode Toggle -->
+        <button class="btn-theme-toggle" id="btn-theme-toggle" title="Ubah Mode Gelap/Terang">
+          <i class="bi bi-sun"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- SECTION 1: DASHBOARD STATISTIK -->
+    <section class="content-section active" id="sec-dashboard">
+      <!-- Quick Navigation Bar -->
+      <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-dark rounded border border-secondary">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-info-circle-fill text-warning fs-5"></i>
+          <span class="fw-semibold" style="font-size: 14px;">Akses cepat panduan penanganan keadaan darurat pendakian & keselamatan umum:</span>
+        </div>
+        <a href="/edukasi" class="btn btn-sm btn-warning fw-bold font-monospace">
+          <i class="bi bi-book-half"></i> Edukasi & Keselamatan
+        </a>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="stat-cards-grid">
+        <div class="card-stat">
+          <div class="stat-header">
+            <span class="stat-title">Status Normal (I)</span>
+            <div class="stat-icon" style="background: rgba(76, 154, 126, 0.15); color: #4C9A7E;"><i class="bi bi-shield-check"></i></div>
+          </div>
+          <div class="stat-value" id="stat-normal-count" style="color: #4C9A7E;">0</div>
+          <div class="stat-sub">Gunung api kondisi aman</div>
+        </div>
+
+        <div class="card-stat">
+          <div class="stat-header">
+            <span class="stat-title">Status Waspada (II)</span>
+            <div class="stat-icon" style="background: rgba(232, 185, 35, 0.15); color: #E8B923;"><i class="bi bi-exclamation-triangle"></i></div>
+          </div>
+          <div class="stat-value" id="stat-waspada-count" style="color: #E8B923;">0</div>
+          <div class="stat-sub">Peningkatan aktivitas visual/seismik</div>
+        </div>
+
+        <div class="card-stat">
+          <div class="stat-header">
+            <span class="stat-title">Status Siaga (III)</span>
+            <div class="stat-icon" style="background: rgba(232, 115, 12, 0.15); color: #E8730C;"><i class="bi bi-bell"></i></div>
+          </div>
+          <div class="stat-value" id="stat-siaga-count" style="color: #E8730C;">0</div>
+          <div class="stat-sub">Potensi erupsi meluas</div>
+        </div>
+
+        <div class="card-stat">
+          <div class="stat-header">
+            <span class="stat-title">Status Awas (IV)</span>
+            <div class="stat-icon" style="background: rgba(193, 39, 45, 0.15); color: #C1272D;"><i class="bi bi-exclamation-octagon"></i></div>
+          </div>
+          <div class="stat-value" id="stat-awas-count" style="color: #C1272D;">0</div>
+          <div class="stat-sub">Ancaman bahaya erupsi utama</div>
+        </div>
+
+        <div class="card-stat">
+          <div class="stat-header">
+            <span class="stat-title">Gempa Hari Ini</span>
+            <div class="stat-icon" style="background: rgba(0, 180, 216, 0.15); color: #00b4d8;"><i class="bi bi-pulse"></i></div>
+          </div>
+          <div class="stat-value" id="stat-gempa-today" style="color: #00b4d8;">0</div>
+          <div class="stat-sub">BMKG, USGS & Vulkanik</div>
+        </div>
+
+        <div class="card-stat">
+          <div class="stat-header">
+            <span class="stat-title">Gunung Paling Aktif</span>
+            <div class="stat-icon" style="background: rgba(255, 107, 53, 0.15); color: #ff6b35;"><i class="bi bi-fire"></i></div>
+          </div>
+          <div class="stat-value" id="stat-most-active" style="font-size:22px; color: #ff6b35;">-</div>
+          <div class="stat-sub">Berdasarkan frekuensi kegempaan</div>
+        </div>
+      </div>
+
+      <!-- PERMANENT WIDGET: SOP PENDAKIAN GUNUNG -->
+      <div class="sop-widget-card">
+        <div class="sop-widget-header">
+          <div class="d-flex align-items-center gap-2">
+            <span class="fs-4">📋</span>
+            <div>
+              <h3 class="m-0 fw-bold font-monospace" style="color: var(--accent-orange); font-size: 20px;">SOP PENDAKIAN GUNUNG</h3>
+              <small class="text-muted">Widget Permanen Keselamatan Pendakian Gunung Api Indonesia</small>
+            </div>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-success" id="btn-sop-read-confirm">
+              <i class="bi bi-check-lg"></i> [ ✔ ] Saya Sudah Membaca SOP
+            </button>
+            <a href="/edukasi" class="btn btn-sm btn-warning font-monospace fw-bold">
+              <i class="bi bi-book-fill"></i> [ Lihat Edukasi & SOP Lengkap ]
+            </a>
+          </div>
+        </div>
+
+        <div class="sop-grid-container">
+          <!-- 📋 Sebelum Mendaki -->
+          <div class="sop-box">
+            <div class="sop-box-title">📋 Sebelum Mendaki</div>
+            <ul>
+              <li><i class="bi bi-check2-circle"></i> Cek status gunung melalui PVMBG & prakiraan cuaca.</li>
+              <li><i class="bi bi-check2-circle"></i> Daftar melalui jalur resmi (Simaksi).</li>
+              <li><i class="bi bi-check2-circle"></i> Beritahu keluarga/rekan terkait rencana perjalanan.</li>
+              <li><i class="bi bi-check2-circle"></i> Pastikan kondisi fisik prima. Jangan mendaki sendirian.</li>
+            </ul>
+          </div>
+
+          <!-- 🎒 Checklist Peralatan Singkat -->
+          <div class="sop-box">
+            <div class="sop-box-title">🎒 Checklist Peralatan</div>
+            <div class="checklist-grid" id="sop-dashboard-checklist-container" style="max-height: 180px; overflow-y: auto;">
+              <!-- Dynamic checklist -->
+            </div>
+          </div>
+
+          <!-- ⚠ Saat Mendaki -->
+          <div class="sop-box">
+            <div class="sop-box-title">⚠ Saat Mendaki</div>
+            <ul>
+              <li><i class="bi bi-exclamation-triangle"></i> Ikuti jalur resmi (jangan buka jalur baru).</li>
+              <li><i class="bi bi-exclamation-triangle"></i> Bawa turun sampahmu (Leave No Trace).</li>
+              <li><i class="bi bi-exclamation-triangle"></i> Jangan memetik tanaman / memberi makan satwa liar.</li>
+              <li><i class="bi bi-exclamation-triangle"></i> Jangan memaksakan muncak (summit) jika cuaca buruk.</li>
+            </ul>
+          </div>
+
+          <!-- ☎ Nomor Darurat -->
+          <div class="sop-box">
+            <div class="sop-box-title" style="color: var(--accent-green);">☎ Nomor Darurat</div>
+            <div class="d-grid gap-2 text-center mt-2">
+              <div class="p-2 bg-dark rounded border"><span class="text-muted">Basarnas:</span> <strong class="text-success fs-5">115</strong></div>
+              <div class="p-2 bg-dark rounded border"><span class="text-muted">Layanan Darurat Terpadu:</span> <strong class="text-info fs-5">112</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cuaca Gunung Widget (Open Meteo) -->
+      <div class="panel-card mb-4">
+        <div class="panel-header">
+          <div class="panel-title"><i class="bi bi-cloud-sun-fill"></i> Cuaca Real-Time Gunung Api (Open Meteo API)</div>
+        </div>
+        <div class="sop-grid-container" id="weather-widget-container" style="max-height: 200px; overflow-y: auto;">
+          <!-- Dynamically populated weather -->
+        </div>
+      </div>
+
+      <!-- Charts Grid -->
+      <div class="charts-grid">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title"><i class="bi bi-graph-up-arrow"></i> Grafik Aktivitas Kegempaan (7 Hari & 30 Hari)</div>
+          </div>
+          <ul class="nav nav-tabs border-0 mb-3" id="chartTabs">
+            <li class="nav-item">
+              <button class="nav-link active bg-transparent text-light border-0 fw-bold" id="tab-7d-btn" data-bs-toggle="tab" data-bs-target="#tab-7d">7 Hari Terakhir</button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link bg-transparent text-light border-0 fw-bold" id="tab-30d-btn" data-bs-toggle="tab" data-bs-target="#tab-30d">30 Hari Terakhir</button>
+            </li>
+          </ul>
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="tab-7d">
+              <div class="chart-container">
+                <canvas id="chart-activity-7d"></canvas>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="tab-30d">
+              <div class="chart-container">
+                <canvas id="chart-activity-30d"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title"><i class="bi bi-pie-chart-fill"></i> Proporsi Status Gunung</div>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-status-breakdown"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: MONITORING GUNUNG API -->
+    <section class="content-section" id="sec-monitoring">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title"><i class="bi bi-card-checklist"></i> Database Monitoring Gunung Api Indonesia (MAGMA ESDM)</div>
+        </div>
+        <p class="text-muted mb-4">Menampilkan status aktivitas seluruh gunung api di Pulau Jawa dan luar Pulau Jawa.</p>
+        <div id="volcano-cards-container" class="volcano-grid">
+          <!-- Dynamically loaded 44+ volcano cards -->
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: KUBAH LAVA -->
+    <section class="content-section" id="sec-kubah-lava">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title"><i class="bi bi-triangle-half"></i> DB Monitoring Gunung Api dan Kubah Lava</div>
+        </div>
+        <p class="text-muted mb-4">Menampilkan perkembangan tinggi, volume, dan morfologi kubah lava berdasarkan laporan PVMBG MAGMA Indonesia.</p>
+
+        <div class="table-responsive mb-4">
+          <table class="table-custom">
+            <thead>
+              <tr>
+                <th>Nama Gunung</th>
+                <th>Status Aktivitas</th>
+                <th>Tinggi Kubah</th>
+                <th>Volume Kubah</th>
+                <th>Pertumbuhan</th>
+                <th>Status Morfologi</th>
+                <th>Update Terakhir</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="table-kubah-lava-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel-card bg-transparent border">
+          <div class="panel-header">
+            <div class="panel-title"><i class="bi bi-graph-up"></i> Grafik Perkembangan Volume Kubah Lava</div>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-kubah-lava-series"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 4: PETA SEBARAN GEMPA REAL TIME -->
+    <section class="content-section" id="sec-peta-gempa">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title"><i class="bi bi-map-fill"></i> Peta Sebaran Gempa & Gunung Api Indonesia (Leaflet.js)</div>
+          <span class="badge bg-secondary font-monospace" id="map-last-sync">Update otomatis setiap 10 detik</span>
+        </div>
+
+        <div class="d-flex gap-3 mb-3 flex-wrap align-items-center font-monospace" style="font-size:12px;">
+          <span>Legend Status Gunung:</span>
+          <span class="badge" style="background:#4C9A7E;">🟢 Normal</span>
+          <span class="badge" style="background:#E8B923; color:#111;">🟡 Waspada</span>
+          <span class="badge" style="background:#E8730C;">🟠 Siaga</span>
+          <span class="badge" style="background:#C1272D;">🔴 Awas</span>
+          <span class="badge" style="background:#8b9bb4;">⚪ Status Aktivitas Tidak Tersedia</span>
+        </div>
+
+        <div id="leaflet-map"></div>
+      </div>
+    </section>
+
+    <!-- SECTION 5: HALAMAN KHUSUS: EDUKASI & KESELAMATAN -->
+    <section class="content-section" id="sec-panduan">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title"><i class="bi bi-shield-exclamation text-warning"></i> Modul Edukasi & Keselamatan Pendakian Lengkap</div>
+          <a href="/edukasi" class="btn btn-sm btn-warning fw-bold font-monospace">
+            <i class="bi bi-box-arrow-up-right"></i> Buka Halaman Edukasi Khusus
+          </a>
+        </div>
+
+        <div id="panduan-syarat-content" class="mb-4"></div>
+        <div id="panduan-checklist-container" class="checklist-grid mb-4"></div>
+      </div>
+    </section>
+
+    <!-- SECTION 6: TELEGRAM REAL TIME & LOG -->
+    <section class="content-section" id="sec-telegram-log">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title"><i class="bi bi-telegram"></i> Telegram Early Warning System (Anti-Spam & 24/7 Service)</div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-info" onclick="sendTelegramHourlyTest()">
+              <i class="bi bi-clock-history"></i> Tes Laporan 1 Jam
+            </button>
+            <button class="btn btn-sm btn-primary" id="btn-test-telegram" onclick="sendTelegramTest()">
+              <i class="bi bi-send"></i> Tes Instant Alert
+            </button>
+          </div>
+        </div>
+        <p class="text-muted mb-3">Notifikasi Telegram **tetap berjalan 24 jam nonstop di latar belakang server** meskipun website/browser ditutup. Notifikasi instan dikirim saat ada kejadian baru, dan laporan ringkasan dikirim otomatis setiap 1 jam sekali.</p>
+        
+        <div class="activity-feed" id="activity-feed-container">
+          <!-- Feed Items dynamically populated -->
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- BOOTSTRAP MODAL: CCTV REAL-TIME PREVIEW -->
+<div class="modal fade" id="modalCctvPreview" tabindex="-1" aria-labelledby="modalCctvLabel" aria-hidden="true" style="background: rgba(0,0,0,0.6);">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content bg-dark text-light border-secondary shadow-lg">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title font-monospace text-warning d-flex align-items-center gap-2" id="modalCctvLabel">
+          <i class="bi bi-camera-video-fill"></i> <span id="modalCctvGunungTitle">Pratinjau CCTV Real-Time</span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" onclick="closeCctvModal()" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="modalCctvBody">
+        <div class="text-center py-4 text-muted">
+          <div class="spinner-border text-warning mb-2" role="status"></div>
+          <div>Memuat alur kamera CCTV...</div>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary justify-content-between">
+        <small class="text-muted font-monospace" id="modalCctvFooterNote">Sumber: MAGMA Indonesia (PVMBG)</small>
+        <button type="button" class="btn btn-sm btn-secondary font-monospace" onclick="closeCctvModal()">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JS Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Custom JS -->
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/map.js"></script>
+<script src="/static/js/main.js"></script>
+</body>
+</html>
